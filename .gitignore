@@ -1,0 +1,23 @@
+# Media / disc images
+*.mkv
+*.mp4
+*.iso
+*.vob
+*.VOB
+
+# DVD files
+*.ifo
+*.IFO
+*.bup
+*.BUP
+
+# Build products
+*.o
+build/
+
+# Generated/debug output
+*.log
+
+# Editor junk
+*~
+*.swp
