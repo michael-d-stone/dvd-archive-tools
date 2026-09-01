@@ -21,3 +21,5 @@ build/
 # Editor junk
 *~
 *.swp
+#random
+build-ifo-dump
