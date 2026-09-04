@@ -15,6 +15,7 @@
 *.o
 build/
 test_menus/
+test_menus_all/
 
 # Generated/debug output
 *.log

@@ -1,8 +1,53 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <dvdread/dvd_reader.h>
 #include <dvdread/ifo_read.h>
+
+static int is_ffmpeg_candidate(pgc_t *pgc)
+{
+    return pgc &&
+           pgc->nr_of_programs > 0 &&
+           pgc->nr_of_cells > 0 &&
+           pgc->program_map != NULL &&
+           pgc->cell_playback != NULL;
+}
+
+static void print_candidates(unsigned int menu_vts, pgci_ut_t *pgci_ut)
+{
+    if (!pgci_ut) {
+        return;
+    }
+
+    for (unsigned int lu_index = 0;
+         lu_index < pgci_ut->nr_of_lus;
+         lu_index++) {
+
+        pgci_lu_t *lu = &pgci_ut->lu[lu_index];
+
+        if (!lu->pgcit) {
+            continue;
+        }
+
+        for (unsigned int pgc_index = 0;
+             pgc_index < lu->pgcit->nr_of_pgci_srp;
+             pgc_index++) {
+
+            pgci_srp_t *srp =
+                &lu->pgcit->pgci_srp[pgc_index];
+
+            if (!is_ffmpeg_candidate(srp->pgc)) {
+                continue;
+            }
+
+            printf("%u %u %u\n",
+                   menu_vts,
+                   lu_index + 1,
+                   pgc_index + 1);
+        }
+    }
+}
 
 static void print_menu_pgcs(const char *domain, pgci_ut_t *pgci_ut)
 {
@@ -55,12 +100,6 @@ static void print_menu_pgcs(const char *domain, pgci_ut_t *pgci_ut)
                 continue;
             }
 
-            int ffmpeg_candidate =
-                pgc->nr_of_programs > 0 &&
-                pgc->nr_of_cells > 0 &&
-                pgc->program_map != NULL &&
-                pgc->cell_playback != NULL;
-
             printf(
                 "      PGC %u: programs=%u cells=%u "
                 "program_map=%s cell_playback=%s %s\n",
@@ -69,7 +108,7 @@ static void print_menu_pgcs(const char *domain, pgci_ut_t *pgci_ut)
                 pgc->nr_of_cells,
                 pgc->program_map ? "yes" : "no",
                 pgc->cell_playback ? "yes" : "no",
-                ffmpeg_candidate
+                is_ffmpeg_candidate(pgc)
                     ? "[ffmpeg candidate]"
                     : "[not playable]"
             );
@@ -79,19 +118,28 @@ static void print_menu_pgcs(const char *domain, pgci_ut_t *pgci_ut)
 
 int main(int argc, char **argv)
 {
-    if (argc != 2) {
+    int candidates_only = 0;
+    const char *dvd_path = NULL;
+
+    if (argc == 2) {
+        dvd_path = argv[1];
+    } else if (argc == 3 &&
+               strcmp(argv[1], "--candidates") == 0) {
+        candidates_only = 1;
+        dvd_path = argv[2];
+    } else {
         fprintf(stderr,
-                "Usage: %s <dvd path or iso>\n",
+                "Usage: %s [--candidates] <dvd path or iso>\n",
                 argv[0]);
         return 1;
     }
 
-    dvd_reader_t *dvd = DVDOpen(argv[1]);
+    dvd_reader_t *dvd = DVDOpen(dvd_path);
 
     if (!dvd) {
         fprintf(stderr,
                 "Could not open DVD: %s\n",
-                argv[1]);
+                dvd_path);
         return 1;
     }
 
@@ -104,8 +152,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    printf("Opened DVD successfully.\n");
-
     if (!vmg->vmgi_mat) {
         fprintf(stderr,
                 "VMG metadata missing.\n");
@@ -117,37 +163,58 @@ int main(int argc, char **argv)
     unsigned int title_sets =
         vmg->vmgi_mat->vmg_nr_of_title_sets;
 
-    printf("Title sets: %u\n\n", title_sets);
+    if (candidates_only) {
+        print_candidates(0, vmg->pgci_ut);
 
-    print_menu_pgcs("VMGM", vmg->pgci_ut);
+        for (unsigned int vts = 1;
+             vts <= title_sets;
+             vts++) {
 
-    printf("\n");
+            ifo_handle_t *vts_ifo = ifoOpen(dvd, vts);
 
-    for (unsigned int vts = 1;
-         vts <= title_sets;
-         vts++) {
+            if (!vts_ifo) {
+                continue;
+            }
 
-        ifo_handle_t *vts_ifo =
-            ifoOpen(dvd, vts);
+            print_candidates(vts,
+                             vts_ifo->pgci_ut);
 
-        if (!vts_ifo) {
-            printf("VTS %u: could not open\n\n", vts);
-            continue;
+            ifoClose(vts_ifo);
         }
+    } else {
+        printf("Opened DVD successfully.\n");
+        printf("Title sets: %u\n\n", title_sets);
 
-        char domain[32];
-
-        snprintf(domain,
-                 sizeof(domain),
-                 "VTSM VTS=%u",
-                 vts);
-
-        print_menu_pgcs(domain,
-                        vts_ifo->pgci_ut);
+        print_menu_pgcs("VMGM", vmg->pgci_ut);
 
         printf("\n");
 
-        ifoClose(vts_ifo);
+        for (unsigned int vts = 1;
+             vts <= title_sets;
+             vts++) {
+
+            ifo_handle_t *vts_ifo =
+                ifoOpen(dvd, vts);
+
+            if (!vts_ifo) {
+                printf("VTS %u: could not open\n\n", vts);
+                continue;
+            }
+
+            char domain[32];
+
+            snprintf(domain,
+                     sizeof(domain),
+                     "VTSM VTS=%u",
+                     vts);
+
+            print_menu_pgcs(domain,
+                            vts_ifo->pgci_ut);
+
+            printf("\n");
+
+            ifoClose(vts_ifo);
+        }
     }
 
     ifoClose(vmg);

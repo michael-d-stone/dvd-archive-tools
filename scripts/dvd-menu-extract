@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+FFMPEG="/opt/ffmpeg-dvd/bin/ffmpeg"
+
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+    echo "Usage: $0 <dvd.iso|dvd-path> [output-directory]" >&2
+    exit 1
+fi
+
+DVD="$1"
+OUT="${2:-menus}"
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+IFO_DUMP="$REPO_DIR/build-ifo-dump"
+
+if [[ ! -x "$IFO_DUMP" ]]; then
+    echo "Error: $IFO_DUMP does not exist or is not executable." >&2
+    echo "Build ifo_dump first." >&2
+    exit 1
+fi
+
+if [[ ! -x "$FFMPEG" ]]; then
+    echo "Error: $FFMPEG not found." >&2
+    exit 1
+fi
+
+mkdir -p "$OUT"
+
+while read -r vts lu pgc; do
+    printf -v filename \
+        'vts_%03d_lu_%03d_pgc_%03d.mkv' \
+        "$vts" "$lu" "$pgc"
+
+    outfile="$OUT/$filename"
+
+    echo
+    echo "=== VTS $vts / LU $lu / PGC $pgc ==="
+    echo "-> $outfile"
+
+    if [[ -e "$outfile" ]]; then
+        echo "Already exists; skipping."
+        continue
+    fi
+
+    "$FFMPEG" \
+        -nostdin \
+        -f dvdvideo \
+        -menu 1 \
+        -menu_vts "$vts" \
+        -menu_lu "$lu" \
+        -pgc "$pgc" \
+        -i "$DVD" \
+        -map 0 \
+        -c copy \
+        "$outfile"
+
+done < <("$IFO_DUMP" --candidates "$DVD")
