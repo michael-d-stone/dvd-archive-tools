@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+FFMPEG="/opt/ffmpeg-dvd/bin/ffmpeg"
+LSDVD="$(command -v lsdvd || true)"
+
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+    echo "Usage: $0 <dvd.iso|dvd-path> [output-directory]" >&2
+    exit 1
+fi
+
+DVD="$1"
+OUT="${2:-titles}"
+
+if [[ ! -x "$FFMPEG" ]]; then
+    echo "Error: $FFMPEG not found." >&2
+    exit 1
+fi
+
+if [[ -z "$LSDVD" ]]; then
+    echo "Error: lsdvd not found." >&2
+    exit 1
+fi
+
+mkdir -p "$OUT"
+
+title_count="$(
+    "$LSDVD" "$DVD" 2>/dev/null |
+    awk '/Title: [0-9]+/ {count++} END {print count+0}'
+)"
+
+if [[ "$title_count" -lt 1 ]]; then
+    echo "Error: could not determine title count." >&2
+    exit 1
+fi
+
+echo "Found $title_count title(s)."
+
+for ((title=1; title<=title_count; title++)); do
+    printf -v filename 'title_%03d.mkv' "$title"
+    outfile="$OUT/$filename"
+
+    echo
+    echo "=== Title $title ==="
+    echo "-> $outfile"
+
+    if [[ -e "$outfile" ]]; then
+        echo "Already exists; skipping."
+        continue
+    fi
+
+    "$FFMPEG" \
+        -nostdin \
+        -f dvdvideo \
+        -title "$title" \
+        -trim 0 \
+        -preindex 1 \
+        -i "$DVD" \
+        -map 0 \
+        -c copy \
+        "$outfile"
+done
