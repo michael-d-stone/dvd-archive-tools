@@ -2,6 +2,7 @@
 set -euo pipefail
 
 FFMPEG="/opt/ffmpeg-dvd/bin/ffmpeg"
+FFPROBE="/opt/ffmpeg-dvd/bin/ffprobe"
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
     echo "Usage: $0 <dvd.iso|dvd-path> [output-directory]" >&2
@@ -47,10 +48,15 @@ while read -r vts lu pgc; do
     echo "=== VTS $vts / LU $lu / PGC $pgc ==="
     echo "-> $outfile"
 
-    if [[ -e "$outfile" ]]; then
-        echo "Already exists; skipping."
+if [[ -e "$outfile" ]]; then
+    if "$FFPROBE" -v error "$outfile" >/dev/null 2>&1; then
+        echo "Already exists and is readable; skipping."
         continue
     fi
+
+    echo "Existing file is invalid; removing and re-extracting."
+    rm -f "$outfile"
+fi
 
     "$FFMPEG" \
         -nostdin \

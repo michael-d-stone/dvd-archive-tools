@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+FFPROBE = "/opt/ffmpeg-dvd/bin/ffprobe"
+
+
+def probe(path):
+    command = [
+        FFPROBE,
+        "-v", "error",
+        "-show_format",
+        "-show_streams",
+        "-show_chapters",
+        "-of", "json",
+        str(path),
+    ]
+
+    result = subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        return {
+            "verified": False,
+            "error": result.stderr.strip(),
+        }
+
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return {
+            "verified": False,
+            "error": f"Invalid ffprobe JSON: {exc}",
+        }
+
+    streams = []
+
+    for stream in data.get("streams", []):
+        item = {
+            "index": stream.get("index"),
+            "codec_type": stream.get("codec_type"),
+            "codec_name": stream.get("codec_name"),
+        }
+
+        if stream.get("codec_type") == "video":
+            item["width"] = stream.get("width")
+            item["height"] = stream.get("height")
+
+        if stream.get("codec_type") == "audio":
+            item["sample_rate"] = stream.get("sample_rate")
+            item["channels"] = stream.get("channels")
+
+        tags = stream.get("tags", {})
+
+        if "language" in tags:
+            item["language"] = tags["language"]
+
+        if "title" in tags:
+            item["title"] = tags["title"]
+
+        streams.append(item)
+
+    try:
+        duration = float(data.get("format", {}).get("duration"))
+    except (TypeError, ValueError):
+        duration = None
+
+    return {
+        "verified": True,
+        "duration": duration,
+        "chapter_count": len(data.get("chapters", [])),
+        "streams": streams,
+    }
+
+
+def classify(path):
+    if path.parent.name == "titles":
+        return "title"
+
+    if path.parent.name == "menus":
+        return "menu"
+
+    return "unknown"
+
+
+def main():
+    if len(sys.argv) != 2:
+        print(
+            f"Usage: {sys.argv[0]} <dvd-extract-directory>",
+            file=sys.stderr,
+        )
+        return 1
+
+    root = Path(sys.argv[1])
+
+    if not root.is_dir():
+        print(f"Error: not a directory: {root}", file=sys.stderr)
+        return 1
+
+    files = sorted(root.glob("titles/*.mkv"))
+    files += sorted(root.glob("menus/*.mkv"))
+
+    if not files:
+        print("Error: no extracted MKV files found.", file=sys.stderr)
+        return 1
+
+    manifest = {
+        "format": "disc-archive-tools dvd-video manifest",
+        "version": 1,
+        "files": [],
+    }
+
+    failures = 0
+
+    for path in files:
+        relative = path.relative_to(root)
+
+        print(f"Verifying {relative}...", file=sys.stderr)
+
+        result = probe(path)
+
+        entry = {
+            "file": str(relative),
+            "kind": classify(path),
+            **result,
+        }
+
+        manifest["files"].append(entry)
+
+        if not result["verified"]:
+            failures += 1
+
+    manifest["summary"] = {
+        "files": len(files),
+        "verified": len(files) - failures,
+        "failed": failures,
+    }
+
+    manifest_path = root / "manifest.json"
+
+    with manifest_path.open("w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, indent=2)
+        handle.write("\n")
+
+    print(
+        f"Wrote {manifest_path}: "
+        f"{len(files) - failures}/{len(files)} verified.",
+        file=sys.stderr,
+    )
+
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

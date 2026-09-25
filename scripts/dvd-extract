@@ -34,6 +34,10 @@ MENU_EXTRACT="$(
     find_tool dvd-menu-extract dvd-menu-extract
 )"
 
+VERIFY="$(
+    find_tool dvd-verify dvd-verify
+)"
+
 if [[ ! -e "$DVD" ]]; then
     echo "Error: DVD source does not exist: $DVD" >&2
     exit 1
@@ -56,6 +60,10 @@ echo "=== Extracting menus ==="
 "$MENU_EXTRACT" "$DVD" "$OUT/menus"
 
 echo
+echo "=== Verifying extraction ==="
+"$VERIFY" "$OUT"
+
+echo
 echo "DVD extraction complete."
 echo
 echo "Titles:"
@@ -63,3 +71,6 @@ echo "  $OUT/titles"
 echo
 echo "Menus:"
 echo "  $OUT/menus"
+echo
+echo "Manifest:"
+echo "  $OUT/manifest.json"

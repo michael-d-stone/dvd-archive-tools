@@ -16,6 +16,8 @@
 build/
 test_menus/
 test_menus_all/
+__pycache__/
+test_dvd_extract/
 
 # Generated/debug output
 *.log
