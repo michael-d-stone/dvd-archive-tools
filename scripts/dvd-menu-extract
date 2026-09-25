@@ -13,7 +13,15 @@ OUT="${2:-menus}"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-IFO_DUMP="$REPO_DIR/build-ifo-dump"
+if [[ -x "$REPO_DIR/build-ifo-dump" ]]; then
+    IFO_DUMP="$REPO_DIR/build-ifo-dump"
+elif command -v dvd-ifo-dump >/dev/null 2>&1; then
+    IFO_DUMP="$(command -v dvd-ifo-dump)"
+else
+    echo "Error: dvd-ifo-dump not found." >&2
+    echo "Run make or install disc-archive-tools." >&2
+    exit 1
+fi
 
 if [[ ! -x "$IFO_DUMP" ]]; then
     echo "Error: $IFO_DUMP does not exist or is not executable." >&2
