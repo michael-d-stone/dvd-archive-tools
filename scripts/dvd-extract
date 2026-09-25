@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+    echo "Usage: $0 <dvd.iso|dvd-path> [output-directory]" >&2
+    exit 1
+fi
+
+DVD="$1"
+OUT="${2:-dvd-extract}"
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+find_tool()
+{
+    local repo_tool="$1"
+    local installed_tool="$2"
+
+    if [[ -x "$SCRIPT_DIR/$repo_tool" ]]; then
+        printf '%s\n' "$SCRIPT_DIR/$repo_tool"
+    elif command -v "$installed_tool" >/dev/null 2>&1; then
+        command -v "$installed_tool"
+    else
+        echo "Error: $installed_tool not found." >&2
+        exit 1
+    fi
+}
+
+TITLE_EXTRACT="$(
+    find_tool dvd-title-extract dvd-title-extract
+)"
+
+MENU_EXTRACT="$(
+    find_tool dvd-menu-extract dvd-menu-extract
+)"
+
+if [[ ! -e "$DVD" ]]; then
+    echo "Error: DVD source does not exist: $DVD" >&2
+    exit 1
+fi
+
+mkdir -p "$OUT"
+
+echo "DVD source:"
+echo "  $DVD"
+echo
+echo "Output:"
+echo "  $OUT"
+echo
+
+echo "=== Extracting titles ==="
+"$TITLE_EXTRACT" "$DVD" "$OUT/titles"
+
+echo
+echo "=== Extracting menus ==="
+"$MENU_EXTRACT" "$DVD" "$OUT/menus"
+
+echo
+echo "DVD extraction complete."
+echo
+echo "Titles:"
+echo "  $OUT/titles"
+echo
+echo "Menus:"
+echo "  $OUT/menus"

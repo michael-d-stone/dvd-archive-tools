@@ -7,7 +7,7 @@ PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 
 PROGRAM = build-ifo-dump
-SCRIPTS = scripts/dvd-title-extract scripts/dvd-menu-extract
+SCRIPTS = scripts/dvd-title-extract scripts/dvd-menu-extract scripts/dvd-extract
 
 .PHONY: all clean install uninstall
 
@@ -28,4 +28,5 @@ uninstall:
 	rm -f \
 		"$(DESTDIR)$(BINDIR)/dvd-ifo-dump" \
 		"$(DESTDIR)$(BINDIR)/dvd-title-extract" \
-		"$(DESTDIR)$(BINDIR)/dvd-menu-extract"
+		"$(DESTDIR)$(BINDIR)/dvd-menu-extract" \
+		"$(DESTDIR)$(BINDIR)/dvd-extract"
