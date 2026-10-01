@@ -61,7 +61,7 @@ echo "=== Extracting menus ==="
 
 echo
 echo "=== Verifying extraction ==="
-"$VERIFY" "$OUT"
+"$VERIFY" "$DVD" "$OUT"
 
 echo
 echo "DVD extraction complete."
