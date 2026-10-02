@@ -1,0 +1,16 @@
+{
+  "name": "Annette Schwarz Is Slutwoman 2",
+  "expected": {
+    "titles": 9,
+    "menus": 16,
+    "files": 25,
+    "verified": 25,
+    "failed": 0
+  },
+  "files": {
+    "titles/title_003.mkv": {
+      "duration": 0.5,
+      "duration_tolerance": 0.01
+    }
+  }
+}

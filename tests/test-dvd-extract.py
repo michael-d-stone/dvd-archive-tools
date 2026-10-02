@@ -5,38 +5,45 @@ import sys
 from pathlib import Path
 
 
-EXPECTED_TITLES = 9
-EXPECTED_MENUS = 16
-EXPECTED_FILES = EXPECTED_TITLES + EXPECTED_MENUS
-
-EXPECTED_TITLE_003_DURATION = 0.500
-
-
 def fail(message):
     print(f"FAIL: {message}", file=sys.stderr)
     return 1
 
 
-def main():
-    if len(sys.argv) != 2:
+def load_json(path, description):
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
         print(
-            f"Usage: {sys.argv[0]} <dvd-extract-directory>",
+            f"FAIL: cannot read {description}: {exc}",
+            file=sys.stderr,
+        )
+        return None
+
+
+def main():
+    if len(sys.argv) != 3:
+        print(
+            f"Usage: {sys.argv[0]} <fixture.json> <dvd-extract-directory>",
             file=sys.stderr,
         )
         return 1
 
-    root = Path(sys.argv[1])
+    fixture_path = Path(sys.argv[1])
+    root = Path(sys.argv[2])
     manifest_path = root / "manifest.json"
 
-    if not manifest_path.is_file():
-        return fail(f"manifest not found: {manifest_path}")
+    fixture = load_json(fixture_path, "fixture")
+    if fixture is None:
+        return 1
 
-    try:
-        with manifest_path.open("r", encoding="utf-8") as handle:
-            manifest = json.load(handle)
-    except (OSError, json.JSONDecodeError) as exc:
-        return fail(f"cannot read manifest: {exc}")
+    manifest = load_json(manifest_path, "manifest")
+    if manifest is None:
+        return 1
 
+    name = fixture.get("name", fixture_path.stem)
+    expected = fixture.get("expected", {})
     files = manifest.get("files", [])
 
     titles = [
@@ -49,19 +56,25 @@ def main():
         if item.get("kind") == "menu"
     ]
 
-    if len(titles) != EXPECTED_TITLES:
+    expected_titles = expected.get("titles")
+    expected_menus = expected.get("menus")
+    expected_files = expected.get("files")
+    expected_verified = expected.get("verified")
+    expected_failed = expected.get("failed")
+
+    if expected_titles is not None and len(titles) != expected_titles:
         return fail(
-            f"expected {EXPECTED_TITLES} titles, got {len(titles)}"
+            f"expected {expected_titles} titles, got {len(titles)}"
         )
 
-    if len(menus) != EXPECTED_MENUS:
+    if expected_menus is not None and len(menus) != expected_menus:
         return fail(
-            f"expected {EXPECTED_MENUS} menus, got {len(menus)}"
+            f"expected {expected_menus} menus, got {len(menus)}"
         )
 
-    if len(files) != EXPECTED_FILES:
+    if expected_files is not None and len(files) != expected_files:
         return fail(
-            f"expected {EXPECTED_FILES} files, got {len(files)}"
+            f"expected {expected_files} files, got {len(files)}"
         )
 
     failed = [
@@ -69,56 +82,74 @@ def main():
         if not item.get("verified")
     ]
 
-    if failed:
-        return fail(f"{len(failed)} files are not verified")
+    verified_count = len(files) - len(failed)
 
-    title_003 = next(
-        (
-            item for item in titles
-            if item.get("file") == "titles/title_003.mkv"
-        ),
-        None,
-    )
-
-    if title_003 is None:
-        return fail("title_003.mkv missing from manifest")
-
-    duration = title_003.get("duration")
-
-    if duration is None:
-        return fail("title_003.mkv has no duration")
-
-    if abs(duration - EXPECTED_TITLE_003_DURATION) > 0.01:
+    if expected_verified is not None and verified_count != expected_verified:
         return fail(
-            "title_003.mkv duration changed: "
-            f"expected {EXPECTED_TITLE_003_DURATION:.3f}, "
-            f"got {duration:.3f}"
+            f"expected {expected_verified} verified files, "
+            f"got {verified_count}"
         )
+
+    if expected_failed is not None and len(failed) != expected_failed:
+        return fail(
+            f"expected {expected_failed} failed files, got {len(failed)}"
+        )
+
+    manifest_files = {
+        item.get("file"): item
+        for item in files
+        if item.get("file")
+    }
+
+    for filename, rules in fixture.get("files", {}).items():
+        item = manifest_files.get(filename)
+
+        if item is None:
+            return fail(f"expected file missing: {filename}")
+
+        if "duration" in rules:
+            actual = item.get("duration")
+
+            if actual is None:
+                return fail(f"{filename} has no duration")
+
+            expected_duration = float(rules["duration"])
+            tolerance = float(rules.get("duration_tolerance", 0.01))
+
+            if abs(actual - expected_duration) > tolerance:
+                return fail(
+                    f"{filename} duration changed: "
+                    f"expected {expected_duration:.3f} "
+                    f"+/- {tolerance:.3f}, got {actual:.3f}"
+                )
 
     summary = manifest.get("summary", {})
 
-    if summary.get("files") != EXPECTED_FILES:
-        return fail(
-            f"manifest summary expected {EXPECTED_FILES} files, "
-            f"got {summary.get('files')}"
-        )
+    if expected_files is not None:
+        if summary.get("files") != expected_files:
+            return fail(
+                f"manifest summary expected {expected_files} files, "
+                f"got {summary.get('files')}"
+            )
 
-    if summary.get("verified") != EXPECTED_FILES:
-        return fail(
-            f"manifest summary expected {EXPECTED_FILES} verified, "
-            f"got {summary.get('verified')}"
-        )
+    if expected_verified is not None:
+        if summary.get("verified") != expected_verified:
+            return fail(
+                f"manifest summary expected {expected_verified} verified, "
+                f"got {summary.get('verified')}"
+            )
 
-    if summary.get("failed") != 0:
-        return fail(
-            f"manifest summary reports {summary.get('failed')} failures"
-        )
+    if expected_failed is not None:
+        if summary.get("failed") != expected_failed:
+            return fail(
+                f"manifest summary expected {expected_failed} failures, "
+                f"got {summary.get('failed')}"
+            )
 
-    print("PASS: DVD regression fixture")
+    print(f"PASS: {name}")
     print(f"  titles:   {len(titles)}")
     print(f"  menus:    {len(menus)}")
-    print(f"  verified: {len(files)}/{EXPECTED_FILES}")
-    print(f"  title 003: {duration:.3f} s")
+    print(f"  verified: {verified_count}/{len(files)}")
 
     return 0
 
