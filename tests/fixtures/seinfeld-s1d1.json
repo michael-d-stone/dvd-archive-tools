@@ -1,0 +1,30 @@
+{
+  "name": "Seinfeld S1D1",
+  "expected": {
+    "titles": 16,
+    "menus": 45,
+    "files": 61,
+    "verified": 61,
+    "failed": 0
+  },
+  "files": {
+    "titles/title_001.mkv": {
+      "chapters": 5,
+      "streams": {
+        "video": 1,
+        "audio": 4,
+        "subtitle": 9
+      }
+    },
+    "titles/title_016.mkv": {
+      "duration": 5.005,
+      "duration_tolerance": 0.01,
+      "chapters": 2,
+      "streams": {
+        "video": 1,
+        "audio": 4,
+        "subtitle": 9
+      }
+    }
+  }
+}

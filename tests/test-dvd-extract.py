@@ -123,6 +123,39 @@ def main():
                     f"+/- {tolerance:.3f}, got {actual:.3f}"
                 )
 
+        if "chapters" in rules:
+            actual_chapters = item.get("chapter_count")
+            expected_chapters = int(rules["chapters"])
+
+            if actual_chapters != expected_chapters:
+                return fail(
+                    f"{filename} chapter count changed: "
+                    f"expected {expected_chapters}, "
+                    f"got {actual_chapters}"
+                )
+
+        if "streams" in rules:
+            actual_streams = {}
+
+            for stream in item.get("streams", []):
+                stream_type = stream.get("codec_type")
+
+                if stream_type is None:
+                    continue
+
+                actual_streams[stream_type] = (
+                    actual_streams.get(stream_type, 0) + 1
+                )
+
+            for stream_type, expected_count in rules["streams"].items():
+                actual_count = actual_streams.get(stream_type, 0)
+
+                if actual_count != expected_count:
+                    return fail(
+                        f"{filename} {stream_type} stream count changed: "
+                        f"expected {expected_count}, got {actual_count}"
+                    )
+
     summary = manifest.get("summary", {})
 
     if expected_files is not None:
