@@ -45,15 +45,15 @@ for ((title=1; title<=title_count; title++)); do
     echo "=== Title $title ==="
     echo "-> $outfile"
 
-if [[ -e "$outfile" ]]; then
-    if "$FFPROBE" -v error "$outfile" >/dev/null 2>&1; then
-        echo "Already exists and is readable; skipping."
-        continue
-    fi
+    if [[ -e "$outfile" ]]; then
+        if "$FFPROBE" -v error "$outfile" >/dev/null 2>&1; then
+            echo "Already exists and is readable; skipping."
+            continue
+        fi
 
-    echo "Existing file is invalid; removing and re-extracting."
-    rm -f "$outfile"
-fi
+        echo "Existing file is invalid; removing and re-extracting."
+        rm -f "$outfile"
+    fi
 
     "$FFMPEG" \
         -nostdin \
