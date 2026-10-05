@@ -9,7 +9,7 @@ BINDIR ?= $(PREFIX)/bin
 PROGRAM = build-ifo-dump
 SCRIPTS = scripts/dvd-title-extract scripts/dvd-menu-extract scripts/dvd-extract scripts/dvd-verify
 
-.PHONY: all clean install uninstall
+.PHONY: all clean install uninstall test
 
 all: $(PROGRAM)
 
@@ -31,3 +31,11 @@ uninstall:
 		"$(DESTDIR)$(BINDIR)/dvd-menu-extract" \
 		"$(DESTDIR)$(BINDIR)/dvd-extract" \
 		"$(DESTDIR)$(BINDIR)/dvd-verify"
+
+test:
+		tests/test-dvd-extract.py \
+		tests/fixtures/annette.json \
+		test_dvd_extract
+	tests/test-dvd-extract.py \
+		tests/fixtures/seinfeld-s1d1.json \
+		test_seinfeld_extract
