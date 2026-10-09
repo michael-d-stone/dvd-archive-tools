@@ -27,3 +27,4 @@ test_dvd_extract/
 *.swp
 #random
 build-ifo-dump
+test_seinfeld_extract/
